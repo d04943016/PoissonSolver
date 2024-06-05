@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import trange
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 """ gradient """
 def do_gradient(vec:np.ndarray, dx:float = 1.0) -> np.ndarray:
@@ -92,7 +92,7 @@ class AdamUpdater:
         self.__size = size
         self.init()
 
-class Adagrad:
+class AdagradUpdater:
     def __init__(self, size:int, lr:float=0.5, epsilon:float = 1e-8):
         self.size = size
         self.lr = lr
@@ -130,10 +130,10 @@ def construct_updater(size, V_updater:Optional[Callable[[np.ndarray, np.ndarray]
         V_updater = lambda vec, delta: vec + delta  
     elif callable(V_updater):
         V_updater = V_updater
-    elif V_updater.upper() == 'ADAM':
+    elif V_updater.upper() in ('ADAM', 'ADAMUPDATER'):
         V_updater = AdamUpdater(size = size)
-    elif V_updater.upper() == 'ADAGRAD':
-        V_updater = Adagrad(size = size)
+    elif V_updater.upper() in ('ADAGRAD', 'ADAGRADUPDATER'):
+        V_updater = AdagradUpdater(size = size)
     else:
         V_updater = AdamUpdater(size = size)
     return V_updater
@@ -204,7 +204,225 @@ def solve_Poisson_1D(x:np.ndarray,
     return V    
 
 
-""" plots """
+""" plots 1D """
+def plot_BandDiagram_1D(x:np.ndarray,
+                        Ec:Optional[np.ndarray] = None,
+                        Ev:Optional[np.ndarray] = None,
+                        Ef:Optional[Union[float,np.ndarray]] = 0.0,
+                        ax:Optional[plt.Axes] = None,
+                        **kwargs,
+    ) -> plt.Axes:
+    """ plot band diagram """
+    # get ax
+    if ax is None:
+        im_width = kwargs.get('im_width', 8)
+        im_height = kwargs.get('im_height', 6)
+        _, ax = plt.subplots(1, 1, figsize=(im_width, im_height))
+    
+    # controls
+    xscaling = kwargs.get('xscaling', 1e4)
+    xlabel = kwargs.get('xlabel', r'$x (\mu m)$')
+    ylabel = kwargs.get('ylabel', r'Energy (eV)')
+    title = kwargs.get('title',   r'Band Diagram')
+    fontsize = kwargs.get('fontsize', 12)
+    linewidth = kwargs.get('linewidth', 2)
+
+    # plot Ec 
+    if Ec is not None:
+        ax.plot(x * xscaling, Ec, linewidth=linewidth, label=kwargs.get('Ec_label', 'Ec'), color=kwargs.get('Ec_color', 'b'))
+    
+    # plot Ev
+    if Ev is not None:
+        ax.plot(x * xscaling, Ev, linewidth=linewidth, label=kwargs.get('Ev_label', 'Ev'), color=kwargs.get('Ev_color', 'orange'))
+
+    # plot Ef
+    if Ef is not None:
+        Ef_linestyle = kwargs.get('Ef_linestyle', 'k--')
+        if isinstance(Ef, (int, float)):
+            ax.plot(x * xscaling, np.ones_like(x)*Ef, Ef_linestyle, linewidth=linewidth, label = kwargs.get('Ef_label', 'Ef'))
+        else:
+            ax.plot(x * xscaling, Ef, Ef_linestyle, linewidth=linewidth, label = kwargs.get('Ef_label', 'Ef'))
+
+    # set controls
+    ax.legend(fontsize = fontsize)
+    ax.set_xlabel(xlabel, fontsize = fontsize)  
+    ax.set_ylabel(ylabel, fontsize = fontsize)
+    ax.set_title(title,   fontsize = fontsize)
+    return ax
+
+def plot_gaussian_Dit(x:np.ndarray,
+                      E_dit_mean:np.ndarray,
+                      E_dit_sigma:np.ndarray,
+                      z:Optional[np.ndarray] = None,
+                      ax:Optional[plt.Axes] = None,
+                      **kwargs,
+    ) -> plt.Axes:
+    """ plot Dit """
+    # get ax
+    if ax is None:
+        im_width = kwargs.get('im_width', 8)
+        im_height = kwargs.get('im_height', 6)
+        _, ax = plt.subplots(1, 1, figsize=(im_width, im_height))
+    
+    # controls
+    xscaling = kwargs.get('xscaling', 1e4)
+    xlabel = kwargs.get('xlabel', r'$x (\mu m)$')
+    ylabel = kwargs.get('ylabel', r'Energy (eV)')
+    title = kwargs.get('title',   r'Band Diagram')
+    fontsize = kwargs.get('fontsize', 12)
+    linewidth = kwargs.get('linewidth', 2)
+    alpha = kwargs.get('alpha', 0.3)
+
+    # plot Dit
+    z = 3 if z is None else z
+    ax.plot(x * xscaling, E_dit_mean, linewidth=linewidth, label=kwargs.get('Dit_label', 'Dit'), color=kwargs.get('Dit_color', 'r'))
+    ax.fill_between(x * xscaling, E_dit_mean - z*E_dit_sigma, E_dit_mean + z*E_dit_sigma, alpha=alpha, color=kwargs.get('fill_color', 'red'))
+
+    # set controls
+    ax.legend(fontsize = fontsize)
+    ax.set_xlabel(xlabel, fontsize = fontsize)
+    ax.set_ylabel(ylabel, fontsize = fontsize)
+    ax.set_title(title,   fontsize = fontsize)
+    return ax
+
+def plot_carrier_density_1D( x:np.ndarray, 
+                             n:Optional[np.ndarray] = None,
+                             p:Optional[np.ndarray] = None,
+                             Na:Optional[np.ndarray] = None,
+                             Nd:Optional[np.ndarray] = None,
+                             Dit:Optional[np.ndarray] = None,
+                             ax:Optional[plt.Axes] = None,
+                             **kwargs,
+    )->plt.Axes:
+    """ plot charge density """
+    # get ax
+    if ax is None:
+        im_width = kwargs.get('im_width', 8)
+        im_height = kwargs.get('im_height', 6)
+        _, ax = plt.subplots(1, 1, figsize=(im_width, im_height))
+
+    # controls
+    xscaling = kwargs.get('xscaling', 1e4)
+    xlabel = kwargs.get('xlabel', r'$x (\mu m)$')
+    ylabel = kwargs.get('ylabel', r'Density $(1/cm^{-3})$')
+    title = kwargs.get('title',   r'Charge Density')
+    fontsize = kwargs.get('fontsize', 12)
+    yscale = kwargs.get('yscale', 'log')
+    linewidth = kwargs.get('linewidth', 2)
+
+    # plot Na
+    if Na is not None:
+        ax.plot(x * xscaling, Na, linewidth=linewidth, label=kwargs.get('Na_label', 'Na'), color=kwargs.get('Na_color', 'b'))
+
+    # plot Nd   
+    if Nd is not None:
+        ax.plot(x * xscaling, Nd, linewidth=linewidth, label=kwargs.get('Nd_label', 'Nd'), color=kwargs.get('Nd_color', 'orange'))
+
+    # plot n
+    if n is not None:
+        ax.plot(x * xscaling, n, linewidth=linewidth, label=kwargs.get('n_label', 'n'), color=kwargs.get('n_color', 'green'))
+    
+    # plot p
+    if p is not None:
+        ax.plot(x * xscaling, p, linewidth=linewidth, label=kwargs.get('p_label', 'p'), color=kwargs.get('p_color', 'red'))
+
+    # plot Dit
+    if Dit is not None:
+        ax.plot(x * xscaling, np.abs(Dit), linewidth=linewidth, label=kwargs.get('Dit_label', 'Dit'), color=kwargs.get('Dit_color', 'purple'))
+
+    # set controls
+    ax.legend(fontsize = fontsize)
+    ax.set_xlabel(xlabel, fontsize = fontsize)
+    ax.set_ylabel(ylabel, fontsize = fontsize)
+    ax.set_title(title,   fontsize = fontsize)
+    ax.set_yscale(yscale)
+    return ax
+
+def plot_total_charge_density_1D(x:np.ndarray,
+                                 total_charge_density:Optional[np.ndarray] = None,
+                                 ax:Optional[plt.Axes] = None,
+                                 **kwargs,
+    )->plt.Axes:
+    """ plot total charge density """
+    # get ax
+    if ax is None:
+        im_width = kwargs.get('im_width', 8)
+        im_height = kwargs.get('im_height', 6)
+        _, ax = plt.subplots(1, 1, figsize=(im_width, im_height))
+
+    # controls
+    xscaling = kwargs.get('xscaling', 1e4)
+    xlabel = kwargs.get('xlabel', r'$x (\mu m)$')
+    ylabel = kwargs.get('ylabel', r'Density $(1/cm^{-3})$')
+    title = kwargs.get('title',   r'Total Charge Density')
+    fontsize = kwargs.get('fontsize', 12)
+    yscale = kwargs.get('yscale', 'log')
+
+    positive_color = kwargs.get('positive_color', 'lightblue')
+    negative_color = kwargs.get('negative_color', 'pink')
+
+    # plot total charge density
+    if total_charge_density is not None:
+        mask = total_charge_density > 0
+        total_mask = np.zeros_like(total_charge_density)
+        total_mask[mask] = total_charge_density[mask]
+        ax.fill_between(x * xscaling, total_mask, color=positive_color, label=kwargs.get('positive_label', 'Positive Charge (+)'))
+
+        mask = total_charge_density < 0
+        total_mask = np.zeros_like(total_charge_density)
+        total_mask[mask] =  np.abs( total_charge_density[mask] )
+        ax.fill_between(x * xscaling, total_mask, color=negative_color, label=kwargs.get('negative_label', 'Negative Charge (-)'))
+        
+    # set controls
+    ax.legend(fontsize = fontsize)
+    ax.set_xlabel(xlabel, fontsize = fontsize)
+    ax.set_ylabel(ylabel, fontsize = fontsize)
+    ax.set_title(title,   fontsize = fontsize)
+    ax.set_yscale(yscale)
+    return ax
+
+def plot_Field_1D(x:np.ndarray,
+                  V:Optional[np.ndarray] = None,
+                  Field:Optional[np.ndarray] = None,
+                  ax:Optional[plt.Axes] = None,
+                  **kwargs,
+    )->plt.Axes:
+    """ plot electric field """
+    # get ax
+    if ax is None:
+        im_width = kwargs.get('im_width', 8)
+        im_height = kwargs.get('im_height', 6)
+        _, ax = plt.subplots(1, 1, figsize=(im_width, im_height))
+
+    # controls
+    xscaling = kwargs.get('xscaling', 1e4)
+    fontsize = kwargs.get('fontsize', 12)
+    linewidth = kwargs.get('linewidth', 2)
+    rotation = 0
+    labelpad = 0
+
+    ax.set_title(kwargs.get('title',   r'Field'), fontsize = fontsize)
+
+    # plot Field
+    if Field is not None:
+        ax.plot( x * xscaling, Field, label=kwargs.get('Field_label', 'Field'), linewidth=linewidth, color = kwargs.get('Field_color', 'b') )
+        ax.legend(fontsize = fontsize)
+        ax.set_xlabel(kwargs.get('xlabel', r'$x (\mu m)$'), fontsize = fontsize)
+        ax.set_ylabel(kwargs.get('ylabel', r'Field (V/cm)'), fontsize = fontsize)
+        
+        if V is not None:
+            ax = ax.twinx()
+            rotation = -90
+            labelpad = 20
+
+    # plot V
+    if V is not None:
+        ax.plot(x * xscaling, V, label=kwargs.get('V_label', 'V'), linewidth=linewidth, color = kwargs.get('V_color', 'r') )
+        ax.set_ylabel(r'Voltage (V)', color = kwargs.get('V_color', 'r'), rotation=rotation, labelpad=labelpad, fontsize = fontsize)
+        ax.tick_params(axis='y', colors=kwargs.get('V_color', 'r'))
+        ax.legend()
+    return ax
+        
 def plot_Poisson_1D(x:np.ndarray, 
                     V:np.ndarray = None, 
                     n:np.ndarray = None, 
@@ -212,66 +430,25 @@ def plot_Poisson_1D(x:np.ndarray,
                     total_charge_density:np.ndarray = None,
                     Ec:np.ndarray = None, 
                     Ev:np.ndarray = None, 
+                    Ef:Optional[Union[float,np.ndarray]] = 0.0,
                     Field:np.ndarray = None, 
                     Na:np.ndarray = None, 
                     Nd:np.ndarray = None,
+                    Dit:Optional[np.ndarray] = None,
     **kwargs):
-    fig, ax = plt.subplots(1, 4, figsize=(30, 6))
-    if Ec is not None:
-        ax[0].plot(x * 1e4, Ec, label='Ec')
-    if Ev is not None:
-        ax[0].plot(x * 1e4, Ev, label='Ev')
+    _, ax = plt.subplots(1, 4, figsize=(30, 6))
 
-    ax[0].plot(x * 1e4, np.zeros_like(x), 'k--', label='Ef')
-    ax[0].legend()
-    ax[0].set_xlabel(r'$x (\mu m)$')
-    ax[0].set_ylabel(r'Energy (eV)')
-    ax[0].set_title(r'Band Diagram')
+    # plot band diagram
+    plot_BandDiagram_1D(x=x,Ec=Ec,Ev=Ev,Ef=Ef,ax=ax[0],**kwargs)
 
-    if Na is not None:
-        ax[1].plot(x * 1e4, Na, label='Na')
-    if Nd is not None:
-        ax[1].plot(x * 1e4, Nd, label='Nd')
-    if n is not None:
-        ax[1].plot(x * 1e4, n, label='n')
-    if p is not None:
-        ax[1].plot(x * 1e4, p, label='p')
-    ax[1].legend()
-    ax[1].set_xlabel(r'$x (\mu m)$')
-    ax[1].set_ylabel(r'$Density (1/cm^{-3})$')
-    ax[1].set_title(r'Charge Density')
-    ax[1].set_yscale('log')
-    
-    if total_charge_density is not None:
-        mask = total_charge_density > 0
-        total_mask = np.zeros_like(total_charge_density)
-        total_mask[mask] = total_charge_density[mask]
-        ax[2].fill_between(x * 1e4, total_mask, color='lightblue', label='Positive Charge (+)')
-        mask = total_charge_density < 0
-        total_mask = np.zeros_like(total_charge_density)
-        total_mask[mask] =  np.abs( total_charge_density[mask] )
-        ax[2].fill_between(x * 1e4, total_mask, color='pink', label='Negative Charge (-)')
-        
-        ax[2].set_xlabel(r'$x (\mu m)$')
-        ax[2].set_ylabel(r'$Density (1/cm^{-3})$')
-        ax[2].set_title(r'Total Charge Density')
-        ax[2].set_yscale('log')
-        ax[2].legend()
+    # plot charge density
+    plot_carrier_density_1D(x=x,n=n,p=p,Na=Na,Nd=Nd,Dit=Dit,ax=ax[1],**kwargs)
 
-    if Field is not None:
-        ax[3].plot( (x[1:]+x[:-1] )/2* 1e4, Field, label='Field')
-    ax[3].legend()
-    ax[3].set_xlabel(r'$x (\mu m)$')
-    ax[3].set_ylabel(r'Field (V/cm)')
-    ax[3].set_title(r'Electric Field & Voltage')
+    # plot total charge density
+    plot_total_charge_density_1D(x=x,total_charge_density=total_charge_density,ax=ax[2],**kwargs)
 
-    if V is not None:
-        ax3_2 = ax[3].twinx()
-        ax3_2.plot(x * 1e4, V, 'r', label='V')
-        ax3_2.set_ylabel(r'Voltage (V)', color='red', rotation=-90, labelpad=20)  # Set the y-axis label rotation to 90 degrees and increase the labelpad value to move the label further away from the axis
-        ax3_2.tick_params(axis='y', colors='r')  # Set the tick color to red
-        ax3_2.legend()
-
+    # plot field
+    plot_Field_1D(x=x,V=V,Field=Field,ax=ax[3],**kwargs)
     return ax
 
 

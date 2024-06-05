@@ -56,6 +56,7 @@ def dope_constant_acceptor(x:np.ndarray, Nd:float, x_range:np.ndarray) -> np.nda
     Nd_vec = dope_constant_donor(x = x, Na = Nd, x_range = x_range)
     return Nd_vec
 
+""" 1D charge density """
 def cal_electron_density_at_different_x(x:np.ndarray, Ec:np.ndarray, Ef:float, kT:float, materials:str, x_range:np.ndarray) -> np.ndarray:
     """ calculate electron density in different materials """
     x_range = np.asarray(x_range)
@@ -147,8 +148,11 @@ def get_episolon_r_at_different_x(x:np.ndarray, materials:List[str], x_range:np.
         epsilon_r_vec[mask] = epsilon_r[material]
     return epsilon_r_vec
 
-
-
+""" 1D field """
+def cal_electric_field(x:np.ndarray, V:np.ndarray) -> np.ndarray:
+    """ calculate electric field """
+    E = -np.gradient(V, x)
+    return E
 
 
 
