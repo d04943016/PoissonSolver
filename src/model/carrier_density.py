@@ -4,14 +4,14 @@ from .position import get_1D_position_mask
 
 from typing import List, Callable
 
-# constants
-Nc = {'Si':2.8e19,  'GaAs':4.7e17,  'Ge':1.04e19, 'AlAs':1.5e19, 'GaP':1.8e19, 'InAs':8.3e16, 'InP':5.2e17 }  # cm^-3
-Nv = {'Si':1.04e19, 'GaAs':7.0e18,  'Ge':6.0e18,  'AlAs':1.7e19, 'GaP':1.9e19, 'InAs':6.4e18, 'InP':1.1e19 }  # cm^-3
-Eg = {'Si':1.12,    'GaAs':1.43,    'Ge':0.66,    'AlAs':2.16,   'GaP':2.21,   'InAs':0.36,   'InP':1.35  }  # eV
+# constants / InGaN's value is an average value
+Nc = {'Si':2.8e19,  'GaAs':4.7e17,  'Ge':1.04e19, 'AlAs':1.5e19, 'GaP':1.8e19, 'InAs':8.3e16, 'InP':5.2e17, 'GaN':2.3e18, 'InGaN':1.5e18  }  # cm^-3
+Nv = {'Si':1.04e19, 'GaAs':7.0e18,  'Ge':6.0e18,  'AlAs':1.7e19, 'GaP':1.9e19, 'InAs':6.4e18, 'InP':1.1e19, 'GaN':1.0e19, 'InGaN':1.0e19  }  # cm^-3
+Eg = {'Si':1.12,    'GaAs':1.43,    'Ge':0.66,    'AlAs':2.16,   'GaP':2.21,   'InAs':0.36,   'InP':1.35,   'GaN':3.4,    'InGaN':2.05    }  # eV
 
 # electron affinity
-EA = {'Si':4.05,    'GaAs':4.07,    'Ge':4.0,     'AlAs':2.62,   'GaP':4.3,    'InAs':4.9,    'InP':4.35    }  # eV
-epsilon_r = {'Si':11.7, 'GaAs':12.9,'Ge':16.0,    'AlAs':10.1,   'GaP':11.1,   'InAs':14.6,   'InP':12.4    }  # 1/cm
+EA = {'Si':4.05,    'GaAs':4.07,    'Ge':4.0,     'AlAs':2.62,   'GaP':4.3,    'InAs':4.9,    'InP':4.35,   'GaN':4.1,    'InGaN':4.9}  # eV
+epsilon_r = {'Si':11.7, 'GaAs':12.9,'Ge':16.0,    'AlAs':10.1,   'GaP':11.1,   'InAs':14.6,   'InP':12.4,   'GaN':8.9,    'InGaN':12.0} 
 
 
 """ basic semi-conductor """
