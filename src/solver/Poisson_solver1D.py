@@ -2,6 +2,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import trange
+
+from .updater import construct_updater 
+
 from typing import Callable, Optional, Union
 
 """ gradient """
@@ -52,91 +55,7 @@ def solve_Laplacian(A:np.ndarray, b:np.ndarray, reduced:bool = True) -> np.ndarr
         b[ii-1] -= ratio*b[ii]
     return b / A[:,1]
 
-""" Updater """
-class AdamUpdater:
-    def __init__(self, size:int, lr:float=0.1, beta1:float = 0.9, beta2:float = 0.999, epsilon:float = 1e-8):
-        self.size = size
-        self.lr = lr
-        self.beta1 = beta1
-        self.beta2 = beta2
-        self.epsilon = epsilon
-        self.init()
-
-    def init(self):
-        self.vt    = np.zeros(self.size)
-        self.sigma = np.zeros(self.size)
-        self.step = 0
-
-    def update(self, vec:np.ndarray, delta:np.ndarray):
-        if vec.shape != delta.shape:
-            raise ValueError("shape mismatch")
-        
-        self.step += 1
-        self.vt    = self.beta1*self.vt    + (1.0-self.beta1)*delta
-        self.sigma = self.beta2*self.sigma + (1.0-self.beta2)*(delta**2)
-        
-        vt_hat    =    self.vt / (1.0 - self.beta1**self.step)
-        sigma_hat = self.sigma / (1.0 - self.beta2**self.step)
-        new_delta = vt_hat / (np.sqrt(sigma_hat) + self.epsilon)
-        return vec + self.lr*new_delta
-    
-    def __call__(self, vec:np.ndarray, delta:np.ndarray):
-        return self.update(vec, delta)
-    
-    @property
-    def size(self):
-        return self.__size
-    
-    @size.setter
-    def size(self, size:int):
-        self.__size = size
-        self.init()
-
-class AdagradUpdater:
-    def __init__(self, size:int, lr:float=0.5, epsilon:float = 1e-8):
-        self.size = size
-        self.lr = lr
-        self.epsilon = epsilon
-        self.init()
-
-    def init(self):
-        self.sigma = np.zeros(self.size)
-        self.step = 0
-
-    def update(self, vec:np.ndarray, delta:np.ndarray):
-        if vec.shape != delta.shape:
-            raise ValueError("shape mismatch")
-        
-        self.step += 1
-        self.sigma += delta**2
-        new_delta = delta / np.sqrt(self.sigma  + self.epsilon)
-        return vec + self.lr*new_delta
-    
-    def __call__(self, vec:np.ndarray, delta:np.ndarray):
-        return self.update(vec, delta)
-    
-    @property
-    def size(self):
-        return self.__size
-    
-    @size.setter
-    def size(self, size:int):
-        self.__size = size
-        self.init()
-
 """ Poisson Solver """
-def construct_updater(size, V_updater:Optional[Callable[[np.ndarray, np.ndarray], np.ndarray]] = None):
-    if V_updater is None:
-        V_updater = lambda vec, delta: vec + delta  
-    elif callable(V_updater):
-        V_updater = V_updater
-    elif V_updater.upper() in ('ADAM', 'ADAMUPDATER'):
-        V_updater = AdamUpdater(size = size)
-    elif V_updater.upper() in ('ADAGRAD', 'ADAGRADUPDATER'):
-        V_updater = AdagradUpdater(size = size)
-    else:
-        V_updater = AdamUpdater(size = size)
-    return V_updater
 def _construct_V_init(x:np.array, **kwargs):
     if 'V_init' in kwargs:
         V = kwargs['V_init']

@@ -2,7 +2,23 @@ import numpy as np
 
 
 def get_1D_position_mask(x:np.ndarray, x_range:np.ndarray) -> np.ndarray:
-    """ get the mask of x in the range of x_range """
+    """ 
+    get the mask of x in the range of x_range 
+    
+    Usage
+    -----
+    mask = get_1D_position_mask(x, x_range)
+    
+    Parameters
+    ----------
+    x : position
+    x_range : range of position
+    
+    Returns
+    -------
+    mask : mask of x in the range of x_range
+    
+    """
     x_range = np.asarray(x_range)
     if x_range.ndim == 1:
         x_range = np.expand_dims(x_range, axis=0)
