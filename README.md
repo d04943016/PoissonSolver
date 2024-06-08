@@ -23,3 +23,4 @@ In notebook,
   * [Two junctions](notebook/Poisson1D_cases/2.%20Two%20Junctions.ipynb)
   * [GaAs and Si heterojunction](notebook/Poisson1D_cases/3.%20GaAs%20and%20Si%20heterojunction.ipynb)
   * [Boundary condition/metal semiconductor junction](notebook/Poisson1D_cases/4.%20Boundary%20Condition%20(Metal%20Si%20junction).ipynb)
+  * [Multiple Quantum Well (w/o considering quantum effect)](notebook/Poisson1D_cases/5.%20Multiple%20Quantum%20Well.ipynb)
