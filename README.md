@@ -15,5 +15,11 @@ Author : Wei-Kai Lee
 ```
 pip install numpy scipy matplotlib tqdm
 ```
-5. Open [notebook/test.ipynb](notebook/test.ipynb)
 
+### Example
+In notebook,
+* Poisson solver:
+  * [Si PN homojunction](notebook/Poisson1D_cases/Si%20PN%20homojunction.ipynb)
+  * [GaAs and Si heterojunction](notebook/Poisson1D_cases/GaAs%20and%20Si%20heterojunction.ipynb)
+  * [Two junctions](notebook/Poisson1D_cases/Two%20Junctions.ipynb)
+  * [Boundary condition/metal semiconductor junction](notebook/Poisson1D_cases/Boundary%20Condition%20(Metal%20Si%20junction).ipynb)
