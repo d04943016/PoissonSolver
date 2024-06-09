@@ -45,7 +45,7 @@ def finite_wells_potential(x:np.ndarray, x_range:np.ndarray, V0:float=0.0, V1:fl
     """
     mask = get_1D_position_mask(x=x, x_range=x_range)
     V = np.ones_like(x) * V0
-    V[mask] = -V1
+    V[mask] = V1
     return V
 
 
