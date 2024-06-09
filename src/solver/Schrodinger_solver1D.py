@@ -151,7 +151,7 @@ def normalize_psi_by_area(x:np.ndarray, Psis:np.ndarray) -> np.ndarray:
     return Psis
 
 """ Solver """
-def solve_eigenvalue(H:sp.spmatrix, num_eigenvalues:Optional[int] = None) -> np.ndarray:
+def solve_eigenvalue(H:sp.spmatrix, num_eigenvalues:Optional[int] = None, method:Optional[str] = None) -> np.ndarray:
     """
     solve eigenvalue problem
 
@@ -168,14 +168,38 @@ def solve_eigenvalue(H:sp.spmatrix, num_eigenvalues:Optional[int] = None) -> np.
     """
     if num_eigenvalues is None:
         num_eigenvalues = H.shape[0]
-    eigenvalues, eigenvectors = spla.eigs(H, k=num_eigenvalues, which='SM')
-    return eigenvalues, eigenvectors.transpose()
+
+    if method is None:
+        eigenvalues, eigenvectors = np.linalg.eigh(H.todense())
+    elif method.upper() in ('EIGSH', 'EIGENSH', 'EIGENSHARP', 'SHARP', 'S'):
+        eigenvalues, eigenvectors = spla.eigsh(H, k=num_eigenvalues, which='SM')
+    elif method.upper() in ('EIGS', 'EIGEN', 'E'):
+        eigenvalues, eigenvectors = spla.eigs(H, k=num_eigenvalues, which='SM')
+    else:
+        eigenvalues, eigenvectors = np.linalg.eigh(H.todense())
+
+    # to array
+    eigenvalues = np.asarray(eigenvalues)
+    eigenvectors = np.asarray(eigenvectors)
+
+    # sort
+    eigenvectors = eigenvectors.transpose()
+    idx = eigenvalues.argsort()  # 获取排序索引
+    eigenvalues = eigenvalues[idx]
+    eigenvectors = eigenvectors[idx]
+
+    if num_eigenvalues is not None:
+        eigenvalues = eigenvalues[:num_eigenvalues]
+        eigenvectors = eigenvectors[:num_eigenvalues]
+    
+    return eigenvalues, eigenvectors
 
 def solve_Schrodinger_eq(x:np.ndarray, 
                          potential_fun:Callable[[np.ndarray], np.ndarray],
                          h_bar:float = h_bar, 
                          m:float = m0, 
                          num_eigenvalues:Optional[int] = None,
+                        method:Optional[str] = None,
     ) -> np.ndarray:
     """
     solve 1D time-independent Schrodinger equation
@@ -197,8 +221,8 @@ def solve_Schrodinger_eq(x:np.ndarray,
     V = potential_fun(x)
     dx = x[1] - x[0]
     H = construct_hamiltonian_operator(V, dx = dx, h_bar = h_bar, m = m, dtype = np.float64)
-    E, Psis = solve_eigenvalue(H, num_eigenvalues = num_eigenvalues)
-
+    E, Psis = solve_eigenvalue(H, num_eigenvalues = num_eigenvalues, method=method)
+    
     # normalize
     Psis = normalize_psi_by_area(x=x, Psis=Psis)
     return E.real, Psis
@@ -224,6 +248,9 @@ def plot_wavefunctions(x:np.ndarray,
     
     """
     
+    x = np.asarray(x)
+    Psis = np.asarray(Psis)
+
     # get ax
     if ax is None:
         im_width = kwargs.get('im_width', 8)
@@ -296,7 +323,7 @@ def plot_potential(x:np.ndarray, V:np.ndarray, ax:Optional[plt.Axes] = None, **k
 
     return ax
 
-def plot_energy_level(x:np.ndarray, E:np.ndarray, ax:Optional[plt.Axes] = None, **kwargs) -> plt.Axes:
+def plot_energy_level(x:np.ndarray, E:np.ndarray, labels:Optional[np.ndarray] = None, ax:Optional[plt.Axes] = None, **kwargs) -> plt.Axes:
     """
     plot energy levels
     
@@ -307,6 +334,9 @@ def plot_energy_level(x:np.ndarray, E:np.ndarray, ax:Optional[plt.Axes] = None, 
     
     """
     
+    x = np.asarray(x)
+    E = np.asarray(E)
+
     # get ax
     if ax is None:
         im_width = kwargs.get('im_width', 8)
@@ -324,7 +354,10 @@ def plot_energy_level(x:np.ndarray, E:np.ndarray, ax:Optional[plt.Axes] = None, 
     for ii in range(E.size):
         ax.plot(x, np.ones(x.size) * E[ii], linestyle)
 
-        ax.text( x[-1], E[ii], f'E{ii}', fontsize=fontsize, color = color)
+        if labels is not None:
+            ax.text( x[-1], E[ii], labels[ii], fontsize=fontsize, color = color)
+        else:
+            ax.text( x[-1], E[ii], f'$E_{ii}$', fontsize=fontsize, color = color)
     ax.set_xlabel(xlabel, fontsize=fontsize)
     ax.set_ylabel(ylabel, fontsize=fontsize)
 
@@ -361,8 +394,9 @@ def plot_wavefunctions_and_potential(x:np.ndarray,
     # plot
     plot_potential(x, V, ax=ax, **kwargs)
     plot_wavefunctions(x, Psis, offsets=E, labels=labels, scaling=scaling, format=format, ax=ax, **kwargs)
-    plot_energy_level(x, E, ax=ax, **kwargs)
+    plot_energy_level(x, E, ax=ax, labels = labels, **kwargs)
 
     ax.set_ylabel('')
+    ax.set_title(kwargs.get('title', 'Wavefunctions and Potential Energy'))
     return ax
 
