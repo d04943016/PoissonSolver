@@ -24,3 +24,5 @@ In notebook,
   * [GaAs and Si heterojunction](notebook/Poisson1D_cases/3.%20GaAs%20and%20Si%20heterojunction.ipynb)
   * [Boundary condition/metal semiconductor junction](notebook/Poisson1D_cases/4.%20Boundary%20Condition%20(Metal%20Si%20junction).ipynb)
   * [Multiple Quantum Well (w/o considering quantum effect)](notebook/Poisson1D_cases/5.%20Multiple%20Quantum%20Well.ipynb)
+*  Schrodinger solver:
+   *  [Simple Harmonic Oscillator / SHO](notebook/Schrodinger%201D_cases/SHO.ipynb)
