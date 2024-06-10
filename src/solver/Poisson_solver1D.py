@@ -543,7 +543,8 @@ def plot_Poisson_1D(x:np.ndarray,
                     Na:np.ndarray = None, 
                     Nd:np.ndarray = None,
                     Dit:Optional[np.ndarray] = None,
-    **kwargs):
+                    **kwargs,
+    ) -> plt.Axes:
     """
     plot Poisson solution
 
