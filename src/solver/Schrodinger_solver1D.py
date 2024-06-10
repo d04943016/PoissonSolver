@@ -11,7 +11,7 @@ h_bar = h / (2 * np.pi) # reduced Planck constant (J s)
 m0 = 9.10938356e-31     # electron mass (kg)
 
 """ Laplacian """
-def construct_Laplacian_operator(size:int, dx:float = 1.0, dtype = np.float64) -> sp.spmatrix:
+def construct_Laplacian_operator(size:int, dx:float = 1.0, dtype = np.complex128) -> sp.spmatrix:
     """ 
     Construct Laplacian operator (sparse matrix) in 1D
     
@@ -35,7 +35,7 @@ def construct_Laplacian_operator(size:int, dx:float = 1.0, dtype = np.float64) -
     T = sp.diags(diagonals, offsets, shape=(size, size), dtype=dtype)
     return T
 
-def construct_kinetic_operator(size:int, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype = np.float64) -> sp.spmatrix:
+def construct_kinetic_operator(size:int, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype = np.complex128) -> sp.spmatrix:
     """
     construct kinetic operator (sparse matrix) in 1D
 
@@ -54,7 +54,7 @@ def construct_kinetic_operator(size:int, dx:float = 1.0, h_bar:float = h_bar, m:
     """
     return -(h_bar**2/2/m) * construct_Laplacian_operator(size = size, dx = dx, dtype = dtype)
 
-def construct_potential_operator(V:np.ndarray, dtype = np.float64) -> sp.spmatrix:
+def construct_potential_operator(V:np.ndarray, dtype = np.complex128) -> sp.spmatrix:
     """
     construct potential operator (sparse matrix) in 1D
     
@@ -70,7 +70,7 @@ def construct_potential_operator(V:np.ndarray, dtype = np.float64) -> sp.spmatri
     """
     return sp.diags([V], [0], shape=(V.size, V.size), dtype=dtype)
 
-def construct_hamiltonian_operator(V:np.ndarray, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype = np.float64) -> sp.spmatrix:
+def construct_hamiltonian_operator(V:np.ndarray, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype = np.complex128) -> sp.spmatrix:
     """
     construct Hamiltonian operator (sparse matrix) in 1D
 
@@ -199,7 +199,7 @@ def solve_Schrodinger_eq(x:np.ndarray,
                          h_bar:float = h_bar, 
                          m:float = m0, 
                          num_eigenvalues:Optional[int] = None,
-                        method:Optional[str] = None,
+                         method:Optional[str] = None,
     ) -> np.ndarray:
     """
     solve 1D time-independent Schrodinger equation
@@ -220,7 +220,7 @@ def solve_Schrodinger_eq(x:np.ndarray,
     """
     V = potential_fun(x)
     dx = x[1] - x[0]
-    H = construct_hamiltonian_operator(V, dx = dx, h_bar = h_bar, m = m, dtype = np.float64)
+    H = construct_hamiltonian_operator(V, dx = dx, h_bar = h_bar, m = m, dtype = np.complex128)
     E, Psis = solve_eigenvalue(H, num_eigenvalues = num_eigenvalues, method=method)
     
     # normalize
