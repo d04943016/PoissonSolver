@@ -9,10 +9,39 @@ from typing import Callable, Optional, Union
 
 """ gradient """
 def do_gradient(vec:np.ndarray, dx:float = 1.0) -> np.ndarray:
+    """
+    calculate gradient of vec
+
+    Parameters:
+    -----------
+    vec: vector
+    dx: step size
+
+    Returns:
+    --------
+    gradient of vec 
+        * Note the size of gradient is 1 less than the size of vec
+     
+    """
     return (vec[1:] - vec[:-1]) / dx
 
 """ Laplacian """
 def construct_Laplacian_operator(size:int, dx:float = 1.0, reduced:bool = True, dtype = np.float64) -> np.ndarray:
+    """
+    construct Laplacian operator
+
+    Parameters:
+    -----------
+    size: size of the operator
+    dx: step size
+    reduced: reduced form or not
+    dtype: data type
+
+    Returns:
+    --------
+    Laplacian operator
+
+    """
     if reduced:
         A = np.ones( (size, 3), dtype = dtype )
         A[:,1] = -2.0
@@ -31,6 +60,21 @@ def construct_Laplacian_operator(size:int, dx:float = 1.0, reduced:bool = True, 
     return A
 
 def do_Laplacian(vec:np.ndarray, v0:float = 0.0, vn:float = 0.0, dx:float = 1.0) -> np.ndarray:
+    """
+    calculate Laplacian of vec
+    
+    Parameters:
+    -----------
+    vec: vector
+    v0: left boundary condition
+    vn: right boundary condition
+    dx: step size
+    
+    Returns:
+    --------
+    Laplacian of vec
+
+    """
     dv_dxdx = np.zeros_like(vec)
     dv_dxdx[1:-1] = vec[:-2] - 2.0*vec[1:-1] + vec[2:]
     dv_dxdx[0]  = v0 - 2.0*vec[0] + vec[1] 
@@ -39,7 +83,20 @@ def do_Laplacian(vec:np.ndarray, v0:float = 0.0, vn:float = 0.0, dx:float = 1.0)
     return dv_dxdx / (dx**2)
 
 def solve_Laplacian(A:np.ndarray, b:np.ndarray, reduced:bool = True) -> np.ndarray:
-    """ solve Ax = b, A is a Laplcian matrix """
+    """ 
+    solve Ax = b, A is a Laplcian matrix 
+    
+    Parameters:
+    -----------
+    A: Laplacian matrix
+    b: right hand side
+    reduced: reduced form or not
+
+    Returns:
+    --------
+    x: solution
+
+    """
     if not reduced:
         return np.linalg.solve(A, b)
     A, b = A.copy(), b.copy()
@@ -57,6 +114,19 @@ def solve_Laplacian(A:np.ndarray, b:np.ndarray, reduced:bool = True) -> np.ndarr
 
 """ Poisson Solver """
 def _construct_V_init(x:np.array, **kwargs):
+    """
+    construct initial potential
+    
+    Parameters:
+    -----------
+    x: position
+    **kwargs: other parameters
+    
+    Returns:
+    --------
+    V: initial potential
+    
+    """
     if 'V_init' in kwargs:
         V = kwargs['V_init']
     elif 'V_init_func' in kwargs:
@@ -75,14 +145,50 @@ def solve_Poisson_1D(x:np.ndarray,
                      progress_bar:bool = True, 
                      boundary_condition:Optional[Callable[[np.ndarray,np.ndarray], np.ndarray]] = None,
                      record:bool = False,
+                     callback:Optional[Callable[[np.ndarray], None]] = None,
                      **kwargs
     ) -> np.ndarray:
-    """ solve Poisson equation """
+    """ 
+    solve Poisson equation 
+    
+    Usage:
+    ------
+    V = solve_Poisson_1D(x, src_fun, dsrc_dV_fun, v0 = None, vn = None, V_updater = None, max_iter = 1000, tol = 1e-6, progress_bar = True, boundary_condition = None, record = False, callback = None, **kwargs)
+    V, record_V = solve_Poisson_1D(x, src_fun, dsrc_dV_fun, v0 = None, vn = None, V_updater = None, max_iter = 1000, tol = 1e-6, progress_bar = True, boundary_condition = None, record = True, callback = None, **kwargs)
+
+    Parameters:
+    -----------
+    x: position
+    src_fun: source function
+    dsrc_dV_fun: derivative of source function
+    v0: left boundary condition
+        None for 1st order derivative = 0 at the left boundary
+    vn: right boundary condition
+        None for 1st order derivative = 0 at the right boundary
+    V_updater: function to update V
+               new_V = V_updater(V, delta_V)
+    max_iter: maximum iteration
+    tol: tolerance
+    progress_bar: show progress bar or not
+    boundary_condition: boundary condition function
+    record: record V or not
+    callback: callback function
+    **kwargs: other parameters
+
+    Returns:
+    --------
+    V: potential
+    record_V: record of potential
+
+    """
     # initialize
     V = _construct_V_init(x, **kwargs)
     record_V = []
     if record:
         record_V.append(V.copy())
+    
+    if callback is not None:
+        callback(V)
 
     # construct updater
     V_updater = construct_updater(size = x.size, V_updater = V_updater)
@@ -114,6 +220,10 @@ def solve_Poisson_1D(x:np.ndarray,
         # record
         if record:
             record_V.append(V.copy())
+        
+        # callback
+        if callback is not None:
+            callback(V)
 
         if np.linalg.norm(delta_V) < tol:
             break
@@ -131,7 +241,23 @@ def plot_BandDiagram_1D(x:np.ndarray,
                         ax:Optional[plt.Axes] = None,
                         **kwargs,
     ) -> plt.Axes:
-    """ plot band diagram """
+    """
+    plot band diagram 
+    
+    Parameters:
+    -----------
+    x: position
+    Ec: conduction band edge
+    Ev: valence band edge
+    Ef: Fermi level
+    ax: axis
+    **kwargs: other parameters
+
+    Returns:
+    --------
+    ax: axis
+
+    """
     # get ax
     if ax is None:
         im_width = kwargs.get('im_width', 8)
@@ -176,7 +302,23 @@ def plot_gaussian_Dit(x:np.ndarray,
                       ax:Optional[plt.Axes] = None,
                       **kwargs,
     ) -> plt.Axes:
-    """ plot Dit """
+    """ 
+    plot Dit 
+    
+    Parameters:
+    -----------
+    x: position
+    E_dit_mean: mean of Dit
+    E_dit_sigma: sigma of Dit
+    z: z-score
+    ax: axis
+    **kwargs: other parameters
+
+    Returns:
+    --------
+    ax: axis
+
+    """
     # get ax
     if ax is None:
         im_width = kwargs.get('im_width', 8)
@@ -213,7 +355,25 @@ def plot_carrier_density_1D( x:np.ndarray,
                              ax:Optional[plt.Axes] = None,
                              **kwargs,
     )->plt.Axes:
-    """ plot charge density """
+    """ 
+    plot charge density 
+    
+    Parameters:
+    -----------
+    x: position
+    n: electron density
+    p: hole density
+    Na: acceptor density
+    Nd: donor density
+    Dit: interface trap density
+    ax: axis
+    **kwargs: other parameters
+
+    Returns:
+    --------
+    ax: axis
+
+    """
     # get ax
     if ax is None:
         im_width = kwargs.get('im_width', 8)
@@ -262,7 +422,21 @@ def plot_total_charge_density_1D(x:np.ndarray,
                                  ax:Optional[plt.Axes] = None,
                                  **kwargs,
     )->plt.Axes:
-    """ plot total charge density """
+    """ 
+    plot total charge density 
+    
+    Parameters:
+    -----------
+    x: position
+    total_charge_density: total charge density
+    ax: axis
+    **kwargs: other parameters
+
+    Returns:
+    --------
+    ax: axis
+
+    """
     # get ax
     if ax is None:
         im_width = kwargs.get('im_width', 8)
@@ -306,7 +480,22 @@ def plot_Field_1D(x:np.ndarray,
                   ax:Optional[plt.Axes] = None,
                   **kwargs,
     )->plt.Axes:
-    """ plot electric field """
+    """ 
+    plot electric field 
+
+    Parameters:
+    -----------
+    x: position
+    V: potential
+    Field: electric field
+    ax: axis
+    **kwargs: other parameters
+
+    Returns:
+    --------
+    ax: axis
+
+    """
     # get ax
     if ax is None:
         im_width = kwargs.get('im_width', 8)
@@ -355,6 +544,30 @@ def plot_Poisson_1D(x:np.ndarray,
                     Nd:np.ndarray = None,
                     Dit:Optional[np.ndarray] = None,
     **kwargs):
+    """
+    plot Poisson solution
+
+    Parameters:
+    -----------
+    x: position
+    V: potential
+    n: electron density
+    p: hole density
+    total_charge_density: total charge density
+    Ec: conduction band edge
+    Ev: valence band edge
+    Ef: Fermi level
+    Field: electric field
+    Na: acceptor density
+    Nd: donor density
+    Dit: interface trap density
+    **kwargs: other parameters
+
+    Returns:
+    --------
+    ax: axis
+    
+    """
     _, ax = plt.subplots(1, 4, figsize=(30, 6))
 
     # plot band diagram
