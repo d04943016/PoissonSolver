@@ -3,14 +3,14 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
 
-from typing import Optional, Callable, Union
+from typing import Optional, Callable, Union, Tuple
 
 """ constant """
 h = 6.62607015e-34      # Planck constant (J s)
 h_bar = h / (2 * np.pi) # reduced Planck constant (J s)
 m0 = 9.10938356e-31     # electron mass (kg)
 
-""" Laplacian """
+""" operators """
 def construct_Laplacian_operator(size:int, dx:float = 1.0, dtype = np.complex128) -> sp.spmatrix:
     """ 
     Construct Laplacian operator (sparse matrix) in 1D
@@ -27,12 +27,12 @@ def construct_Laplacian_operator(size:int, dx:float = 1.0, dtype = np.complex128
 
     """
     diagonals = [
-        -2 * np.ones(size) / dx**2,
-        np.ones(size-1) / dx**2,
+        -2 * np.ones(size) ,
+        np.ones(size-1),
         np.ones(size-1) / dx**2
     ]
     offsets = [0, -1, 1]
-    T = sp.diags(diagonals, offsets, shape=(size, size), dtype=dtype)
+    T = sp.diags(diagonals, offsets, shape=(size, size), dtype=dtype) / dx**2
     return T
 
 def construct_kinetic_operator(size:int, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype = np.complex128) -> sp.spmatrix:
@@ -91,6 +91,28 @@ def construct_hamiltonian_operator(V:np.ndarray, dx:float = 1.0, h_bar:float = h
     V = construct_potential_operator(V, dtype = dtype)
     return T + V
 
+def construct_PML_vec(x:np.ndarray, 
+                      mask_PML_left:np.ndarray,
+                      mask_PML_right:np.ndarray,
+                      strength:float = 1.0, 
+                      method:str = 'QUADRATIC',
+    ) -> np.ndarray:
+    if method.upper() in ('LINEAR', 'L'):
+        vec = np.zeros_like(x, dtype=np.complex128)
+        vec[mask_PML_left]  = strength * np.linspace(1, 0, np.sum(mask_PML_left))
+        vec[mask_PML_right] = strength * np.linspace(0, 1, np.sum(mask_PML_right))
+        return sp.diags([1j * vec], [0], shape=(x.size, x.size), dtype=np.complex128)
+    
+    elif method.upper() in ('QUADRATIC', 'Q'):
+        vec = np.zeros_like(x, dtype=np.complex128)
+        vec[mask_PML_left]  = strength * np.linspace(1, 0, np.sum(mask_PML_left))**2
+        vec[mask_PML_right] = strength * np.linspace(0, 1, np.sum(mask_PML_right))**2
+        return sp.diags([1j * vec], [0], shape=(x.size, x.size), dtype=np.complex128)
+    
+    else:
+        raise ValueError(f'Invalid method ({method})')
+
+""" psi """
 def translate_psi_to_prob(Psis:np.ndarray) -> np.ndarray:
     """
     translate wavefunction to probability density
@@ -151,6 +173,44 @@ def normalize_psi_by_area(x:np.ndarray, Psis:np.ndarray) -> np.ndarray:
     return Psis
 
 """ Solver """
+def add_PML_layers(x:np.ndarray,
+                   width:Union[float,Tuple[float]] = 1.0,
+                   ratio:Union[float,Tuple[float]] = 0.1,
+                   method:str = 'ratio',
+    ):
+    # get extended width
+    if method.upper() in ('RATIO', ):
+        L = x[-1] - x[0]
+        if isinstance(ratio, tuple):
+            left_width  = ratio[0] * L
+            right_width = ratio[1] * L
+        else:
+            left_width = right_width = ratio * L
+    elif method.upper() in ('WIDTH', ):
+        if isinstance(width, tuple):
+            left_width = width[0]
+            right_width = width[1]
+        else:
+            left_width = right_width = width
+    else:
+        raise ValueError(f'Invalid method ({method})')
+
+    # dx
+    dx = x[1] - x[0]
+
+    # added PML
+    x_left  = np.arange( x[0] - dx,  x[0] - left_width  - dx, -dx)[::-1]
+    x_right = np.arange(x[-1] + dx, x[-1] + right_width + dx,  dx)
+    new_x   = np.concatenate([x_left, x, x_right])
+
+    # mask
+    mask_PML_left = np.zeros_like(new_x, dtype=bool)
+    mask_PML_left[:x_left.size] = True
+    mask_PML_right = np.zeros_like(new_x, dtype=bool)
+    mask_PML_right[-x_right.size:] = True
+
+    return new_x, mask_PML_left, mask_PML_right
+
 def solve_eigenvalue(H:sp.spmatrix, num_eigenvalues:Optional[int] = None, method:Optional[str] = None) -> np.ndarray:
     """
     solve eigenvalue problem
@@ -200,6 +260,8 @@ def solve_Schrodinger_eq(x:np.ndarray,
                          m:float = m0, 
                          num_eigenvalues:Optional[int] = None,
                          method:Optional[str] = None,
+                         add_PML:Optional[bool] = False,
+                         **kwargs,
     ) -> np.ndarray:
     """
     solve 1D time-independent Schrodinger equation
@@ -218,11 +280,32 @@ def solve_Schrodinger_eq(x:np.ndarray,
     psi : wavefunctions
     
     """
-    V = potential_fun(x)
-    dx = x[1] - x[0]
-    H = construct_hamiltonian_operator(V, dx = dx, h_bar = h_bar, m = m, dtype = np.complex128)
-    E, Psis = solve_eigenvalue(H, num_eigenvalues = num_eigenvalues, method=method)
     
+    # get grid values
+    V = potential_fun(x)
+    if add_PML:
+        PML_width  = kwargs.get('PML_width', 1.0)
+        PML_ratio  = kwargs.get('PML_ratio', 0.1)
+        PML_expanding_method = kwargs.get('PML_expanding_method', 'ratio')
+        x, mask_PML_left, mask_PML_right = add_PML_layers(x, width=PML_width, ratio=PML_ratio, method=PML_expanding_method)
+        V = np.concatenate([np.ones_like(x[mask_PML_left]) * V[0], V, np.ones_like(x[mask_PML_right]) * V[-1]])
+
+    # construct Hamiltonian operator
+    T = construct_kinetic_operator(size = V.size, dx = x[1] - x[0], h_bar = h_bar, m = m, dtype = np.complex128)
+    V = construct_potential_operator(V, dtype = np.complex128)
+    H = T + V
+    if add_PML:
+        PML_damping_strength = -(h_bar**2/2/m) * kwargs.get('PML_damping_strength', 1.0)
+        PML_damping_method   = kwargs.get('PML_damping_method', 'QUADRATIC')
+        H = H + construct_PML_vec(x, mask_PML_left=mask_PML_left, mask_PML_right=mask_PML_right, strength=PML_damping_strength, method=PML_damping_method)
+
+    # solve eigenvalue problem
+    E, Psis = solve_eigenvalue(H, num_eigenvalues = num_eigenvalues, method=method)
+    if add_PML:
+        mask_PML = mask_PML_left | mask_PML_right
+        Psis = Psis[:,~mask_PML]
+        x = x[~mask_PML]
+
     # normalize
     Psis = normalize_psi_by_area(x=x, Psis=Psis)
     return E.real, Psis
