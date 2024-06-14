@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
+import scipy
 import matplotlib.pyplot as plt
 
 from typing import Optional, Callable, Union, Tuple
@@ -9,9 +10,10 @@ from typing import Optional, Callable, Union, Tuple
 h = 6.62607015e-34      # Planck constant (J s)
 h_bar = h / (2 * np.pi) # reduced Planck constant (J s)
 m0 = 9.10938356e-31     # electron mass (kg)
+COMPLEX_DTYPE = np.complex128
 
 """ operators """
-def construct_Laplacian_operator(size:int, dx:float = 1.0, dtype = np.complex128) -> sp.spmatrix:
+def construct_Laplacian_operator(size:int, dx:float = 1.0, dtype:np.dtype = COMPLEX_DTYPE) -> sp.spmatrix:
     """ 
     Construct Laplacian operator (sparse matrix) in 1D
     
@@ -35,7 +37,7 @@ def construct_Laplacian_operator(size:int, dx:float = 1.0, dtype = np.complex128
     T = sp.diags(diagonals, offsets, shape=(size, size), dtype=dtype) / dx**2
     return T
 
-def construct_kinetic_operator(size:int, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype = np.complex128) -> sp.spmatrix:
+def construct_kinetic_operator(size:int, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype:np.dtype = COMPLEX_DTYPE) -> sp.spmatrix:
     """
     construct kinetic operator (sparse matrix) in 1D
 
@@ -54,7 +56,7 @@ def construct_kinetic_operator(size:int, dx:float = 1.0, h_bar:float = h_bar, m:
     """
     return -(h_bar**2/2/m) * construct_Laplacian_operator(size = size, dx = dx, dtype = dtype)
 
-def construct_potential_operator(V:np.ndarray, dtype = np.complex128) -> sp.spmatrix:
+def construct_potential_operator(V:np.ndarray, dtype:np.dtype = COMPLEX_DTYPE) -> sp.spmatrix:
     """
     construct potential operator (sparse matrix) in 1D
     
@@ -70,7 +72,7 @@ def construct_potential_operator(V:np.ndarray, dtype = np.complex128) -> sp.spma
     """
     return sp.diags([V], [0], shape=(V.size, V.size), dtype=dtype)
 
-def construct_hamiltonian_operator(V:np.ndarray, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype = np.complex128) -> sp.spmatrix:
+def construct_hamiltonian_operator(V:np.ndarray, dx:float = 1.0, h_bar:float = h_bar, m:float = m0, dtype:np.dtype = COMPLEX_DTYPE) -> sp.spmatrix:
     """
     construct Hamiltonian operator (sparse matrix) in 1D
 
@@ -96,18 +98,19 @@ def construct_PML_vec(x:np.ndarray,
                       mask_PML_right:np.ndarray,
                       strength:float = 1.0, 
                       method:str = 'QUADRATIC',
+                      dtype:np.dtype = COMPLEX_DTYPE,
     ) -> np.ndarray:
     if method.upper() in ('LINEAR', 'L'):
-        vec = np.zeros_like(x, dtype=np.complex128)
+        vec = np.zeros_like(x, dtype=dtype)
         vec[mask_PML_left]  = strength * np.linspace(1, 0, np.sum(mask_PML_left))
         vec[mask_PML_right] = strength * np.linspace(0, 1, np.sum(mask_PML_right))
-        return sp.diags([1j * vec], [0], shape=(x.size, x.size), dtype=np.complex128)
+        return sp.diags([1j * vec], [0], shape=(x.size, x.size), dtype=dtype)
     
     elif method.upper() in ('QUADRATIC', 'Q'):
-        vec = np.zeros_like(x, dtype=np.complex128)
+        vec = np.zeros_like(x, dtype=dtype)
         vec[mask_PML_left]  = strength * np.linspace(1, 0, np.sum(mask_PML_left))**2
         vec[mask_PML_right] = strength * np.linspace(0, 1, np.sum(mask_PML_right))**2
-        return sp.diags([1j * vec], [0], shape=(x.size, x.size), dtype=np.complex128)
+        return sp.diags([1j * vec], [0], shape=(x.size, x.size), dtype=dtype)
     
     else:
         raise ValueError(f'Invalid method ({method})')
@@ -219,6 +222,7 @@ def solve_eigenvalue(H:sp.spmatrix, num_eigenvalues:Optional[int] = None, method
     ----------
     H : Hamiltonian operator
     num_eigenvalues : number of eigenvalues to solve
+    method : method to solve eigenvalue problem ['EIGSH', 'EIGS', None]
 
     Returns
     -------
@@ -261,6 +265,8 @@ def solve_Schrodinger_eq(x:np.ndarray,
                          num_eigenvalues:Optional[int] = None,
                          method:Optional[str] = None,
                          add_PML:Optional[bool] = False,
+                         remove_PML:bool = True,
+                         dtype:np.dtype = COMPLEX_DTYPE,
                          **kwargs,
     ) -> np.ndarray:
     """
@@ -273,6 +279,9 @@ def solve_Schrodinger_eq(x:np.ndarray,
     h_bar : reduced Planck constant
     m : mass of particle
     num_eigenvalues : number of eigenvalues to solve
+    method : method to solve eigenvalue problem ['EIGSH', 'EIGS', None]
+    add_PML : add PML layers
+    remove_PML : remove PML layers
     
     Returns
     -------
@@ -291,8 +300,8 @@ def solve_Schrodinger_eq(x:np.ndarray,
         V = np.concatenate([np.ones_like(x[mask_PML_left]) * V[0], V, np.ones_like(x[mask_PML_right]) * V[-1]])
 
     # construct Hamiltonian operator
-    T = construct_kinetic_operator(size = V.size, dx = x[1] - x[0], h_bar = h_bar, m = m, dtype = np.complex128)
-    V = construct_potential_operator(V, dtype = np.complex128)
+    T = construct_kinetic_operator(size = V.size, dx = x[1] - x[0], h_bar = h_bar, m = m, dtype = dtype)
+    V = construct_potential_operator(V, dtype = dtype)
     H = T + V
     if add_PML:
         PML_damping_strength = -(h_bar**2/2/m) * kwargs.get('PML_damping_strength', 1.0)
@@ -301,7 +310,7 @@ def solve_Schrodinger_eq(x:np.ndarray,
 
     # solve eigenvalue problem
     E, Psis = solve_eigenvalue(H, num_eigenvalues = num_eigenvalues, method=method)
-    if add_PML:
+    if add_PML and remove_PML:
         mask_PML = mask_PML_left | mask_PML_right
         Psis = Psis[:,~mask_PML]
         x = x[~mask_PML]
@@ -352,9 +361,9 @@ def plot_wavefunctions(x:np.ndarray,
         label = None if labels is None else labels[ii]
         
         if scaling is None:
-            scale = 1
-        elif isinstance(scaling, float):
-            scale = scaling
+            scale = 1.0
+        elif isinstance(scaling, (float, int)):
+            scale = float(scaling)
         else:
             scale = scaling[ii]
 

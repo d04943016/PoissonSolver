@@ -94,5 +94,29 @@ def triangle_potential(x:np.ndarray, x_range:np.ndarray, V0:float=0.0, V1:Union[
 
     return V
 
+def inverse_r_potential(x: np.ndarray, x0: float = 0.0, V1: float = 1.0, V0: float = 0.0, V_threshold: float = -1e10, n:int = 1):
+    """
+    Inverse R potential
 
+    Usage
+    -----
+    V = inverse_r_potential(x, x0, V1, V0)
+
+    Parameters
+    ----------
+    x : position
+    x0 : position of the peak
+    V1 : potential energy at the peak
+    V0 : potential energy far from the peak
+    V_threshold : threshold of the potential energy
+    n : power of the denominator
+
+    Returns
+    -------
+    V : potential energy
+
+    """
+    V = V0 - V1 / np.abs( x-x0 )**n
+    V[V <= V_threshold] = V_threshold
+    return V
 
