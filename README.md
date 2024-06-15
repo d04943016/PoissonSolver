@@ -25,5 +25,8 @@ In notebook,
   * [Boundary condition/metal semiconductor junction](notebook/Poisson1D_cases/4.%20Boundary%20Condition%20(Metal%20Si%20junction).ipynb)
   * [Multiple Quantum Well (w/o considering quantum effect)](notebook/Poisson1D_cases/5.%20Multiple%20Quantum%20Well.ipynb)
 *  Schrodinger solver:
-   *  [Simple Harmonic Oscillator / SHO](notebook/Schrodinger%201D_cases/1.%20SHO.ipynb)
-   *  [Finite Quantum Well](notebook/Schrodinger%201D_cases/2.%20Finite%20Quantum%20Well.ipynb)
+   *  [Infinite Quantum Well](notebook/Schrodinger%201D_cases/1.%20Infinite%20Quantum%20Well.ipynb)
+   *  [Simple Harmonic Oscillator / SHO](notebook/Schrodinger%201D_cases/2.%20SHO.ipynb)
+   *  [Rectangular Quantum Well](notebook/Schrodinger%201D_cases/3.%20Rectangular%20Quantum%20Well.ipynb)
+   *  [Triangular Quantum Well](notebook/Schrodinger%201D_cases/4.%20Trianglular%20Quantum%20Well.ipynb)
+   *  [1/r Quantum Well](notebook/Schrodinger%201D_cases/5.%20Inverse%20r%20Quantum%20Well.ipynb)
