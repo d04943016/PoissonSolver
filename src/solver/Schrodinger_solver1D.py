@@ -1,10 +1,9 @@
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
-import scipy
 import matplotlib.pyplot as plt
 
-from typing import Optional, Callable, Union, Tuple
+from typing import Optional, Callable, Union, Tuple, List
 
 """ constant """
 h = 6.62607015e-34      # Planck constant (J s)
@@ -145,6 +144,7 @@ def normalize_psi_max(Psis:np.ndarray, factors:Optional[Union[float, np.ndarray]
     Psis : normalized wavefunctions
     
     """
+    Psis = Psis.copy()
     for ii in range(Psis.shape[0]):
         prob = np.abs(Psis[ii])**2
         prob_max = np.max(prob)
@@ -167,12 +167,20 @@ def normalize_psi_by_area(x:np.ndarray, Psis:np.ndarray) -> np.ndarray:
     Psis : normalized wavefunctions
     
     """
+    
+    if Psis.ndim == 1:
+        Psis = Psis[None,:]
+        only_one_state = True
+    else:
+        only_one_state = False
+
+    Psis = Psis.copy()
     for ii in range(Psis.shape[0]):
         area = np.trapz(np.abs(Psis[ii])**2, x)
         Psis[ii] /= np.sqrt(area)
 
-        factor = np.sign(Psis[ii])
-        Psis[:,ii] *= factor[np.argmax(np.abs(Psis[ii]))]
+    if only_one_state:
+        Psis = Psis[0]
     return Psis
 
 """ Solver """
@@ -319,6 +327,193 @@ def solve_Schrodinger_eq(x:np.ndarray,
     Psis = normalize_psi_by_area(x=x, Psis=Psis)
     return E.real, Psis
 
+
+""" post analysis """
+def cal_momentum(x:np.ndarray, 
+                 Psis:np.ndarray,
+                 h_bar:float = h_bar, 
+                 normalize:bool = True, 
+                 expectation:bool = False,
+    ) -> np.ndarray:
+    """
+    calculate momentum
+    
+    usage
+    -----
+    momentum = cal_momentum(x, Psis, h_bar)
+
+    Parameters
+    ----------
+    x : grid points
+    Psis : wavefunctions
+    h_bar : reduced Planck constant
+    normalize : normalize wavefunctions
+    expectation : calculate expectation value
+
+    Returns
+    -------
+    momentum : momentum 
+               if expectation is True, return expectation value
+               else, return momentum array at each grid point
+    
+    """
+    # normalize wavefunctions
+    if Psis.ndim == 1:
+        Psis = Psis[None,:]
+        only_one_state = True
+    else:
+        only_one_state = False
+    if normalize:
+        Psis = normalize_psi_by_area(x=x, Psis=Psis)
+
+    # calculate momentum at each grid point
+    dx = x[1] - x[0]
+    momentum = np.array( [ psi.conj() * -1j * h_bar * np.gradient(psi, dx) for psi in Psis ] )
+
+    # calculate expectation value / not observable -> still complex
+    if expectation:
+        momentum = np.trapz(momentum, x)
+    
+    if only_one_state == 1:
+        momentum = momentum[0]
+    return momentum
+
+def cal_kinetic_energy(x:np.ndarray, 
+                       Psis:np.ndarray, 
+                       h_bar:float = h_bar, 
+                       m:float = m0, 
+                       Psis_0:Optional[np.ndarray] = None, 
+                       Psis_N:Optional[np.ndarray] = None, 
+                       normalize:bool = True,
+                       expectation:bool = False,
+                       to_real:bool = True,
+    ) -> np.ndarray:
+    """
+    calculate kinetic energy
+    
+    usage
+    -----
+    kinetic_energy = cal_kinetic_energy(x, Psis, h_bar, m, Psis_0 = None, Psis_N = None, normalize = True, expectation = True, to_real = True)
+
+    Parameters
+    ----------
+    x : grid points
+    Psis : wavefunctions
+    h_bar : reduced Planck constant
+    m : mass of particle
+    Psis_0 : wavefunction before x[0]
+    Psis_N : wavefunction after x[-1]
+    normalize : normalize wavefunctions
+    expectation : calculate expectation value
+    to_real : return real part of kinetic energy
+
+    Returns
+    -------
+    kinetic_energy : kinetic energy
+                     if expectation is True, return expectation value
+                     else, return kinetic energy array at each grid point`
+    
+    """
+
+    if Psis.ndim == 1:
+        Psis = np.array([Psis])
+        only_one_state = True
+    else:
+        only_one_state = False
+    
+    # normalize wavefunctions
+    if normalize:
+        Psis = normalize_psi_by_area(x=x, Psis=Psis)
+    
+    # set boundary condition
+    Psis_0 = np.zeros(Psis.shape[0], dtype=Psis.dtype) if Psis_0 is None else Psis_0
+    Psis_N = np.zeros(Psis.shape[0], dtype=Psis.dtype) if Psis_N is None else Psis_N
+    
+    # calculate kinetic energy at each grid point
+    kinetic_energy = np.zeros(Psis.shape, dtype=Psis.dtype)
+    dx = x[1] - x[0]
+    
+    kinetic_energy[:, 1:-1] = (Psis[:, 0:-2] - 2 * Psis[:, 1:-1] + Psis[:, 2:]) / dx**2
+    
+    kinetic_energy[:, 0]    = (Psis_0        - 2 * Psis[:, 0]    + Psis[:, 1] ) / dx**2
+    kinetic_energy[:, -1]   = (Psis[:, -2]   - 2 * Psis[:, -1]   + Psis_N     ) / dx**2
+    kinetic_energy *= -(h_bar**2 / 2 / m)
+    kinetic_energy = Psis.conj() * kinetic_energy
+
+    # calculate expectation value
+    if expectation:
+        kinetic_energy = np.trapz(kinetic_energy, x)
+    
+    # convert to real value / observable
+    if to_real:
+        kinetic_energy = kinetic_energy.real
+    
+    if only_one_state:
+        kinetic_energy = kinetic_energy[0]
+    return kinetic_energy
+
+def cal_potential_energy(x:np.ndarray,
+                         Psis:np.ndarray,
+                         V:Union[np.ndarray, Callable[[np.ndarray], np.ndarray]],
+                         normalize:bool = True,
+                         expectation:bool = False,
+                         to_real:bool = True,
+    ) -> np.ndarray:
+    """
+    calculate potential energy
+
+    usage
+    -----
+    potential_energy = cal_potential_energy(x, V, Psis, normalize = True, expectation = True, to_real = True)
+
+    Parameters
+    ----------
+    x : grid points
+    V : potential energy / can be a function or an array
+    Psis : wavefunctions
+    normalize : normalize wavefunctions
+    expectation : calculate expectation value
+    to_real : return real part of potential energy
+
+    Returns
+    -------
+    potential_energy : potential energy
+                       if expectation is True, return expectation value
+                       else, return potential energy array at each grid point
+    
+    """
+    # normalize wavefunctions
+    if Psis.ndim == 1:
+        Psis = Psis[None,:]
+        is_one_state = True
+    else:
+        is_one_state = False
+    if normalize:
+        Psis = normalize_psi_by_area(x=x, Psis=Psis)
+    
+    # get potential energy
+    if callable(V):
+        V = V(x)
+    if V.size != x.size:
+        raise ValueError(f'The size of V ({V.shape}) must have the same size as x ({x.shape})')
+    
+    # calculate potential energy at each grid point
+    potential_energy = Psis.conj() * V[None,:] * Psis
+
+    # calculate expectation value
+    if expectation:
+        potential_energy = np.trapz(potential_energy, x)
+    
+    # convert to real value / observable
+    if to_real:
+        potential_energy = potential_energy.real
+    
+    if is_one_state:
+        potential_energy = potential_energy[0]
+    return potential_energy
+                        
+
+""" plot """
 def plot_wavefunctions(x:np.ndarray, 
                        Psis:np.ndarray, 
                        offsets:Optional[np.ndarray] = None, 
@@ -488,7 +683,68 @@ def plot_wavefunctions_and_potential(x:np.ndarray,
     plot_wavefunctions(x, Psis, offsets=E, labels=labels, scaling=scaling, format=format, ax=ax, **kwargs)
     plot_energy_level(x, E, ax=ax, labels = labels, **kwargs)
 
-    ax.set_ylabel('')
+    ax.set_xlabel(kwargs.get('xlabel', 'x'))
+    ax.set_ylabel(kwargs.get('ylabel', ''))
+    ax.set_xlim(kwargs.get('xlim', [x[0], x[-1]]))
+    ax.set_ylim(kwargs.get('ylim', [None, None]))
     ax.set_title(kwargs.get('title', 'Wavefunctions and Potential Energy'))
+    
     return ax
 
+def plot_kinetic_energy_and_potential_energy_at_x(
+        x:np.ndarray,
+        Psis:np.ndarray,
+        V:Union[np.ndarray, Callable[[np.ndarray], np.ndarray]],
+        h_bar:float = h_bar, 
+        m:float = m0, 
+        Psis_0:Optional[np.ndarray] = None, 
+        Psis_N:Optional[np.ndarray] = None, 
+        normalize:bool = True,
+        ax:Optional[plt.Axes] = None,
+        lablels:Optional[List[str]] = None,
+        **kwargs,
+    ) -> plt.Axes:
+    """
+    plot kinetic energy and potential energy at each grid point
+
+    """
+    if Psis.ndim == 1:
+        Psis = Psis[None,:]
+
+    # calculate kinetic energy
+    T = cal_kinetic_energy(x = x, Psis = Psis, h_bar = h_bar, m = m, Psis_0 = Psis_0, Psis_N = Psis_N, normalize = normalize, expectation = False, to_real = True)
+
+    # calculate potential energy
+    V = cal_potential_energy(x = x, Psis = Psis, V = V, normalize = normalize, expectation = False, to_real = True)
+
+    # get controls
+    xlabel = kwargs.get('xlabel', 'x')
+    ylabel = kwargs.get('ylabel', 'Energy')
+    fontsize = kwargs.get('fontsize', 12)
+    plot_kinetic_energy = kwargs.get('plot_kinetic_energy', True)
+    plot_potential_energy = kwargs.get('plot_potential_energy', True)
+    plot_total_energy = kwargs.get('plot_total_energy', True)
+
+    labels = lablels if lablels is not None else [f'state-{ii}' for ii in range(Psis.shape[0])]
+    if len(labels) != Psis.shape[0]:
+        raise ValueError(f'The size of labels ({len(labels)}) must have the same size as Psis ({Psis.shape[0]})')
+
+    # get ax
+    if ax is None:
+        im_width = kwargs.get('im_width', 8)
+        im_height = kwargs.get('im_height', 6)
+        _, ax = plt.subplots(1, 1, figsize=(im_width, im_height))
+    
+    # plot
+    for ii in range(Psis.shape[0]):
+        if plot_kinetic_energy:
+            ax.plot(x, T[ii], 'r-', label=f'K.E./{labels[ii]}')
+        if plot_potential_energy:
+            ax.plot(x, V[ii], 'b-', label=f'V/{labels[ii]}')
+        if plot_total_energy:
+            ax.plot(x, T[ii] + V[ii], 'k-', label=f'Total/{labels[ii]}')
+    
+    ax.set_xlabel(xlabel, fontsize=fontsize)
+    ax.set_ylabel(ylabel, fontsize=fontsize)
+    ax.legend(fontsize=fontsize)
+    return ax
